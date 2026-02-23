@@ -12,6 +12,9 @@ enum GameScreen: Hashable {
     case worldMap
     case combat
     case inventory
+    case merchant(Zone)
+    case gameOver
+    case victory
 }
 
 @Observable
@@ -21,6 +24,14 @@ final class GameViewModel {
     var navigationPath: [GameScreen] = []
     var showContinueButton: Bool = false
     var isLoading: Bool = false
+
+    // Combat
+    var currentCombatNode: MapNode?
+    var lastCombatRewards: CombatRewards?
+
+    // Feedback
+    var showLevelUpAlert: Bool = false
+    var showRewardsSheet: Bool = false
 
     private let dataService: DataService
 
@@ -45,11 +56,19 @@ final class GameViewModel {
         }
     }
 
+    func returnToMap() {
+        navigationPath = [.worldMap]
+    }
+
     // MARK: - Gestion de partie
 
     func startNewGame(name: String, playerClass: PlayerClass) {
         gameState = dataService.createNewGame(name: name, playerClass: playerClass)
-        if gameState != nil {
+        if let gameState, let player = gameState.player {
+            // Donner les potions de depart
+            player.inventory.append(ItemCatalog.smallPotion)
+            player.inventory.append(ItemCatalog.smallPotion)
+            player.inventory.append(ItemCatalog.smallPotion)
             navigationPath = [.worldMap]
         }
     }
@@ -74,6 +93,49 @@ final class GameViewModel {
         showContinueButton = dataService.hasSavedGame()
     }
 
+    // MARK: - Combat
+
+    func onCombatVictory(rewards: CombatRewards) {
+        lastCombatRewards = rewards
+
+        guard let player else { return }
+
+        // XP
+        let previousLevel = player.level
+        player.gainXP(rewards.xpGained)
+        if player.level > previousLevel {
+            showLevelUpAlert = true
+        }
+
+        // Or
+        player.gold += rewards.goldGained
+
+        // Loot
+        for item in rewards.itemsLooted {
+            player.addToInventory(item)
+        }
+
+        // Debloquer les nodes suivants
+        if let node = currentCombatNode {
+            let mapVM = MapViewModel()
+            mapVM.completeNode(node, gameState: gameState)
+
+            // Victoire finale si boss de la Citadelle
+            if node.type == .boss && node.zone == .citadel {
+                saveGame()
+                navigationPath = [.victory]
+                return
+            }
+        }
+
+        saveGame()
+        showRewardsSheet = true
+    }
+
+    func onCombatDefeat() {
+        navigationPath = [.gameOver]
+    }
+
     // MARK: - Acces au joueur
 
     var player: Player? {
@@ -87,4 +149,10 @@ final class GameViewModel {
     var playerLevel: Int {
         player?.level ?? 1
     }
+}
+
+struct CombatRewards {
+    let xpGained: Int
+    let goldGained: Int
+    let itemsLooted: [Item]
 }

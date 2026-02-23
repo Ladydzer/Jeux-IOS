@@ -117,10 +117,63 @@ final class Player {
     var defense: Int
     var speed: Int
     var gold: Int
+    var inventoryData: Data?
+    var equippedWeaponData: Data?
+    var equippedArmorData: Data?
+    var monstersKilled: Int
+    var bossesKilled: Int
 
     var playerClass: PlayerClass {
         get { PlayerClass(rawValue: playerClassRaw) ?? .warrior }
         set { playerClassRaw = newValue.rawValue }
+    }
+
+    // Inventaire encode en JSON dans SwiftData
+    var inventory: [Item] {
+        get {
+            guard let data = inventoryData else { return [] }
+            return (try? JSONDecoder().decode([Item].self, from: data)) ?? []
+        }
+        set {
+            inventoryData = try? JSONEncoder().encode(newValue)
+        }
+    }
+
+    var equippedWeapon: Item? {
+        get {
+            guard let data = equippedWeaponData else { return nil }
+            return try? JSONDecoder().decode(Item.self, from: data)
+        }
+        set {
+            equippedWeaponData = newValue != nil ? try? JSONEncoder().encode(newValue) : nil
+        }
+    }
+
+    var equippedArmor: Item? {
+        get {
+            guard let data = equippedArmorData else { return nil }
+            return try? JSONDecoder().decode(Item.self, from: data)
+        }
+        set {
+            equippedArmorData = newValue != nil ? try? JSONEncoder().encode(newValue) : nil
+        }
+    }
+
+    // Stats effectives (base + equipement)
+    var totalAttack: Int {
+        attack + (equippedWeapon?.attackBonus ?? 0) + (equippedArmor?.attackBonus ?? 0)
+    }
+
+    var totalDefense: Int {
+        defense + (equippedWeapon?.defenseBonus ?? 0) + (equippedArmor?.defenseBonus ?? 0)
+    }
+
+    var totalSpeed: Int {
+        speed + (equippedWeapon?.speedBonus ?? 0) + (equippedArmor?.speedBonus ?? 0)
+    }
+
+    var totalMaxHP: Int {
+        maxHP + (equippedWeapon?.hpBonus ?? 0) + (equippedArmor?.hpBonus ?? 0)
     }
 
     init(
@@ -142,6 +195,11 @@ final class Player {
         self.defense = playerClass.baseDefense
         self.speed = playerClass.baseSpeed
         self.gold = gold
+        self.inventoryData = nil
+        self.equippedWeaponData = nil
+        self.equippedArmorData = nil
+        self.monstersKilled = 0
+        self.bossesKilled = 0
     }
 
     var xpToNextLevel: Int {
@@ -198,5 +256,70 @@ final class Player {
     func fullRestore() {
         currentHP = maxHP
         currentMana = maxMana
+    }
+
+    // MARK: - Equipement
+
+    func equip(_ item: Item) {
+        switch item.type {
+        case .weapon:
+            if let old = equippedWeapon {
+                var inv = inventory
+                inv.append(old)
+                inventory = inv
+            }
+            equippedWeapon = item
+            removeFromInventory(item)
+        case .armor:
+            if let old = equippedArmor {
+                var inv = inventory
+                inv.append(old)
+                inventory = inv
+            }
+            equippedArmor = item
+            removeFromInventory(item)
+        case .potion:
+            break
+        }
+    }
+
+    func unequipWeapon() {
+        guard let weapon = equippedWeapon else { return }
+        var inv = inventory
+        inv.append(weapon)
+        inventory = inv
+        equippedWeapon = nil
+    }
+
+    func unequipArmor() {
+        guard let armor = equippedArmor else { return }
+        var inv = inventory
+        inv.append(armor)
+        inventory = inv
+        equippedArmor = nil
+    }
+
+    func usePotion(_ item: Item) {
+        guard item.type == .potion else { return }
+        if item.id.contains("mana") {
+            restoreMana(item.healAmount)
+        } else {
+            heal(item.healAmount)
+        }
+        removeFromInventory(item)
+    }
+
+    func removeFromInventory(_ item: Item) {
+        var inv = inventory
+        if let index = inv.firstIndex(where: { $0.id == item.id }) {
+            inv.remove(at: index)
+            inventory = inv
+        }
+    }
+
+    func addToInventory(_ item: Item) {
+        var inv = inventory
+        inv.append(item)
+        inventory = inv
     }
 }

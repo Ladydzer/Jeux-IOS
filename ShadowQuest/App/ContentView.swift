@@ -24,17 +24,15 @@ struct ContentView: View {
                     case .worldMap:
                         WorldMapView()
                     case .combat:
-                        // Phase 3
-                        Text("Combat — Phase 3")
-                            .foregroundStyle(Theme.textPrimary)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(Theme.background)
+                        CombatView()
                     case .inventory:
-                        // Phase 4
-                        Text("Inventaire — Phase 4")
-                            .foregroundStyle(Theme.textPrimary)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(Theme.background)
+                        InventoryView()
+                    case .merchant(let zone):
+                        MerchantView(zone: zone)
+                    case .gameOver:
+                        GameOverView()
+                    case .victory:
+                        VictoryView()
                     }
                 }
         }
