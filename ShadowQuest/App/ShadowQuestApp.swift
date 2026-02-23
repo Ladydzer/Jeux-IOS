@@ -12,5 +12,6 @@ struct ShadowQuestApp: App {
         WindowGroup {
             ContentView()
         }
+        .modelContainer(for: [Player.self, GameState.self])
     }
 }
